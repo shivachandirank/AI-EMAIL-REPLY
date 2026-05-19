@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Email Reply Generator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f5f3;
+    --surface: #ffffff;
+    --border: rgba(0,0,0,0.1);
+    --border-strong: rgba(0,0,0,0.2);
+    --text: #1a1a18;
+    --muted: #6b6b67;
+    --hint: #9b9b96;
+    --blue-bg: #e6f1fb;
+    --blue-text: #0c447c;
+    --green-bg: #eaf3de;
+    --green-text: #27500a;
+    --amber-bg: #faeeda;
+    --amber-text: #633806;
+    --red-bg: #fcebeb;
+    --red-text: #791f1f;
+    --accent: #1a1a18;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18;
+      --surface: #2c2c2a;
+      --border: rgba(255,255,255,0.1);
+      --border-strong: rgba(255,255,255,0.2);
+      --text: #f0ede6;
+      --muted: #b4b2a9;
+      --hint: #6b6b67;
+      --blue-bg: #0c447c;
+      --blue-text: #b5d4f4;
+      --green-bg: #27500a;
+      --green-text: #c0dd97;
+      --amber-bg: #633806;
+      --amber-text: #fac775;
+      --red-bg: #791f1f;
+      --red-text: #f7c1c1;
+      --accent: #f0ede6;
+    }
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  header { background: var(--surface); border-bottom: 0.5px solid var(--border); padding: 0 20px; height: 52px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .logo { font-size: 15px; font-weight: 500; }
+  .logo span { color: var(--muted); font-weight: 400; }
+  .main { display: flex; flex: 1; overflow: hidden; }
+  .sidebar { width: 300px; border-right: 0.5px solid var(--border); background: var(--surface); display: flex; flex-direction: column; flex-shrink: 0; }
+  .sidebar-header { padding: 12px 16px; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .sidebar-header select { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 4px 8px; font-size: 12px; color: var(--text); cursor: pointer; }
+  .email-list { flex: 1; overflow-y: auto; }
+  .email-item { padding: 12px 16px; border-bottom: 0.5px solid var(--border); cursor: pointer; transition: background 0.1s; }
+  .email-item:hover { background: var(--bg); }
+  .email-item.active { background: var(--blue-bg); }
+  .email-item.unread .email-from { font-weight: 600; }
+  .email-from { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
+  .unread-dot { width: 7px; height: 7px; border-radius: 50%; background: #378add; flex-shrink: 0; }
+  .email-subject { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+  .email-snippet { font-size: 11px; color: var(--hint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .email-date { font-size: 10px; color: var(--hint); float: right; margin-top: 2px; }
+  .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .email-view { flex: 1; overflow-y: auto; padding: 24px; }
+  .email-header-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 16px; }
+  .email-subject-title { font-size: 16px; font-weight: 500; margin-bottom: 10px; }
+  .email-meta { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+  .email-body-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; font-size: 13px; line-height: 1.8; white-space: pre-wrap; color: var(--text); }
+  .reply-section { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 16px; }
+  .section-title { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+  .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .ctrl-group label { font-size: 11px; color: var(--hint); display: block; margin-bottom: 4px; }
+  select, input[type=text] { width: 100%; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 7px 10px; font-size: 12px; color: var(--text); font-family: inherit; outline: none; }
+  select:focus, input:focus { border-color: var(--border-strong); }
+  .btn { border: 0.5px solid var(--border-strong); border-radius: var(--radius-sm); padding: 7px 14px; font-size: 12px; cursor: pointer; font-family: inherit; color: var(--text); background: transparent; transition: all 0.15s; }
+  .btn:hover { background: var(--bg); }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--accent); color: var(--surface); border-color: var(--accent); font-weight: 500; }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .analysis-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 999px; }
+  .badge-blue { background: var(--blue-bg); color: var(--blue-text); }
+  .badge-green { background: var(--green-bg); color: var(--green-text); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber-text); }
+  .badge-red { background: var(--red-bg); color: var(--red-text); }
+  .reply-output { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 14px; font-size: 13px; line-height: 1.8; white-space: pre-wrap; min-height: 80px; color: var(--text); margin-bottom: 12px; }
+  .refine-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .send-row { display: flex; gap: 8px; align-items: center; }
+  .sent-badge { font-size: 12px; color: var(--green-text); background: var(--green-bg); padding: 4px 12px; border-radius: 999px; }
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--hint); gap: 8px; font-size: 13px; }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .auth-banner { background: var(--blue-bg); border-bottom: 0.5px solid var(--border); padding: 10px 20px; display: flex; align-items: center; gap: 12px; font-size: 13px; }
+  .auth-banner a { color: var(--blue-text); font-weight: 500; cursor: pointer; text-decoration: underline; }
+  .user-pill { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .user-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #639922; }
+  .refresh-btn { font-size: 11px; color: var(--hint); background: none; border: none; cursor: pointer; font-family: inherit; }
+  .refresh-btn:hover { color: var(--text); }
+  .hidden { display: none !important; }
+  .analysis-summary { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">AI Email Reply <span>— Gmail connected</span></div>
+  <div id="user-status" class="user-pill hidden">
+    <div class="dot"></div>
+    <span id="user-email-label"></span>
+    <button onclick="logout()" style="background:none;border:none;font-size:11px;color:var(--hint);cursor:pointer;font-family:inherit;">Sign out</button>
+  </div>
+</header>
+
+<div id="auth-banner" class="auth-banner hidden">
+  <span>Connect your Gmail inbox to get started.</span>
+  <a onclick="startAuth()">Connect Gmail</a>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span style="font-size:13px;font-weight:500;">Inbox</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="label-select" onchange="loadEmails()">
+          <option value="INBOX">Inbox</option>
+          <option value="UNREAD">Unread</option>
+          <option value="SENT">Sent</option>
+          <option value="IMPORTANT">Important</option>
+        </select>
+        <button class="refresh-btn" onclick="loadEmails()">↻</button>
+      </div>
+    </div>
+    <div class="email-list" id="email-list">
+      <div class="empty-state" style="padding:40px 16px;">
+        <span>Connect Gmail to see your inbox</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="email-view" id="email-view">
+      <div class="empty-state">
+        <span>Select an email to read and generate a reply</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://127.0.0.1:5000';
+let currentEmail = null;
+let currentReply = '';
+
+async function checkAuth() {
+  try {
+    const r = await fetch(`${API}/auth/status`);
+    const d = await r.json();
+    if (d.authenticated) {
+      document.getElementById('auth-banner').classList.add('hidden');
+      document.getElementById('user-status').classList.remove('hidden');
+      document.getElementById('user-email-label').textContent = d.email;
+      loadEmails();
+    } else {
+      document.getElementById('auth-banner').classList.remove('hidden');
+    }
+  } catch(e) {
+    document.getElementById('auth-banner').classList.remove('hidden');
+  }
+}
+
+async function startAuth() {
+  const r = await fetch(`${API}/auth/login`);
+  const d = await r.json();
+  const popup = window.open(d.auth_url, 'gmail-auth', 'width=500,height=600');
+  window.addEventListener('message', async (e) => {
+    if (e.data === 'auth_success') {
+      popup.close();
+      await checkAuth();
+    }
+  });
+}
+
+async function logout() {
+  await fetch(`${API}/auth/logout`);
+  document.getElementById('auth-banner').classList.remove('hidden');
+  document.getElementById('user-status').classList.add('hidden');
+  document.getElementById('email-list').innerHTML = '<div class="empty-state" style="padding:40px 16px;"><span>Connect Gmail to see your inbox</span></div>';
+  document.getElementById('email-view').innerHTML = '<div class="empty-state"><span>Select an email to read and generate a reply</span></div>';
+}
+
+async function loadEmails() {
+  const label = document.getElementById('label-select').value;
+  const list = document.getElementById('email-list');
+  list.innerHTML = '<div class="empty-state" style="padding:40px 16px;"><span class="spinner"></span> Loading...</div>';
+  try {
+    const r = await fetch(`${API}/emails?label=${label}&max=25`);
+    if (r.status === 401) { list.innerHTML = '<div class="empty-state" style="padding:40px 16px;">Not connected</div>'; return; }
+    const d = await r.json();
+    if (!d.emails || d.emails.length === 0) {
+      list.innerHTML = '<div class="empty-state" style="padding:40px 16px;">No emails found</div>';
+      return;
+    }
+    list.innerHTML = d.emails.map(e => `
+      <div class="email-item ${e.unread ? 'unread' : ''}" onclick="openEmail('${e.id}')" id="item-${e.id}">
+        <div class="email-date">${formatDate(e.date)}</div>
+        <div class="email-from">
+          ${e.unread ? '<div class="unread-dot"></div>' : ''}
+          ${escHtml(parseName(e.from))}
+        </div>
+        <div class="email-subject">${escHtml(e.subject)}</div>
+        <div class="email-snippet">${escHtml(e.snippet)}</div>
+      </div>
+    `).join('');
+  } catch(err) {
+    list.innerHTML = '<div class="empty-state" style="padding:40px 16px;">Failed to load</div>';
+  }
+}
+
+async function openEmail(id) {
+  document.querySelectorAll('.email-item').forEach(el => el.classList.remove('active'));
+  const item = document.getElementById('item-' + id);
+  if (item) { item.classList.add('active'); item.classList.remove('unread'); item.querySelector('.unread-dot') && item.querySelector('.unread-dot').remove(); }
+
+  const view = document.getElementById('email-view');
+  view.innerHTML = '<div class="empty-state"><span class="spinner"></span> Loading email...</div>';
+
+  const r = await fetch(`${API}/emails/${id}`);
+  const email = await r.json();
+  currentEmail = email;
+  currentReply = '';
+
+  view.innerHTML = `
+    <div class="email-header-card">
+      <div class="email-subject-title">${escHtml(email.subject)}</div>
+      <div class="email-meta">
+        <span><strong>From:</strong> ${escHtml(email.from)}</span>
+        <span><strong>To:</strong> ${escHtml(email.to)}</span>
+        <span><strong>Date:</strong> ${escHtml(email.date)}</span>
+      </div>
+    </div>
+
+    <div class="email-body-card">${escHtml(email.body)}</div>
+
+    <div class="reply-section">
+      <div class="section-title">Generate AI reply</div>
+      <div class="controls-grid">
+        <div class="ctrl-group">
+          <label>Tone</label>
+          <select id="tone">
+            <option value="professional">Professional</option>
+            <option value="friendly and warm">Friendly & warm</option>
+            <option value="formal and corporate">Formal / corporate</option>
+            <option value="brief and direct">Brief & direct</option>
+            <option value="empathetic">Empathetic</option>
+            <option value="assertive">Assertive</option>
+          </select>
+        </div>
+        <div class="ctrl-group">
+          <label>Intent</label>
+          <select id="intent">
+            <option value="acknowledge and respond">Acknowledge & respond</option>
+            <option value="accept the request">Accept the request</option>
+            <option value="politely decline">Politely decline</option>
+            <option value="ask for more information">Ask for more info</option>
+            <option value="propose an alternative">Propose alternative</option>
+          </select>
+        </div>
+      </div>
+      <div class="ctrl-group" style="margin-bottom:12px;">
+        <label>Your name (for sign-off)</label>
+        <input type="text" id="sender-name" placeholder="e.g. Priya Sharma, Senior Manager">
+      </div>
+      <button class="btn btn-primary" id="gen-btn" onclick="generateReply()">Generate smart reply</button>
+    </div>
+
+    <div class="reply-section hidden" id="analysis-section">
+      <div class="section-title">Email analysis</div>
+      <div class="analysis-badges" id="analysis-badges"></div>
+      <div class="analysis-summary" id="analysis-summary"></div>
+    </div>
+
+    <div class="reply-section hidden" id="reply-section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div class="section-title" style="margin-bottom:0;">Generated reply</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn" onclick="copyReply()">Copy</button>
+          <button class="btn" onclick="generateReply()">Regenerate</button>
+        </div>
+      </div>
+      <div class="reply-output" id="reply-output"></div>
+      <div class="refine-row">
+        <button class="btn" onclick="refine('make it shorter and more concise')">Shorter</button>
+        <button class="btn" onclick="refine('make it more formal and corporate')">More formal</button>
+        <button class="btn" onclick="refine('make it warmer and friendlier')">Warmer</button>
+        <button class="btn" onclick="refine('add more detail and context')">Add detail</button>
+        <button class="btn" onclick="refine('make it more assertive and confident')">Assertive</button>
+      </div>
+      <div class="send-row">
+        <button class="btn btn-primary" onclick="sendReply()" id="send-btn">Send reply via Gmail</button>
+        <span id="sent-msg" class="sent-badge hidden">Sent!</span>
+      </div>
+    </div>
+  `;
+}
+
+async function generateReply() {
+  if (!currentEmail) {
+    alert("Please select an email first");
+    return;
+  }
+
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Generating...';
+
+  document.getElementById('analysis-section').classList.add('hidden');
+  document.getElementById('reply-section').classList.add('hidden');
+
+  const tone = document.getElementById('tone').value;
+  const intent = document.getElementById('intent').value;
+  const senderName = document.getElementById('sender-name').value;
+
+  try {
+    const response = await fetch(`${API}/generate-reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email_body: currentEmail.body,
+        email_subject: currentEmail.subject,
+        email_from: currentEmail.from,
+        tone: tone,
+        intent: intent,
+        sender_name: senderName
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error("Server not responding");
+    }
+
+    const data = await response.json();
+
+    if (!data.result) {
+      throw new Error("Invalid response from server");
+    }
+
+    parseResult(data.result);
+
+  } catch (error) {
+    console.error("Error:", error);
+    alert("Error generating reply: " + error.message);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Generate smart reply';
+}
+
+function parseResult(text) {
+  let analysis = null;
+  let reply = '';
+  try {
+    const jm = text.match(/ANALYSIS_JSON:\s*([\s\S]*?)END_ANALYSIS/);
+    if (jm) analysis = JSON.parse(jm[1].trim());
+  } catch(e) {}
+  const rm = text.match(/REPLY:\s*([\s\S]*)/);
+  reply = rm ? rm[1].trim() : text;
+  currentReply = reply;
+
+  if (analysis) {
+    const urgClass = {Low:'badge-green',Medium:'badge-amber',High:'badge-red'}[analysis.urgency]||'badge-blue';
+    const sentClass = {Positive:'badge-green',Neutral:'badge-blue',Negative:'badge-red',Mixed:'badge-amber'}[analysis.sentiment]||'badge-blue';
+    document.getElementById('analysis-badges').innerHTML = `
+      <span class="badge badge-blue">${analysis.subject_type}</span>
+      <span class="badge ${urgClass}">Urgency: ${analysis.urgency}</span>
+      <span class="badge ${sentClass}">Sentiment: ${analysis.sentiment}</span>
+    `;
+    document.getElementById('analysis-summary').innerHTML =
+      `<strong>Key ask:</strong> ${analysis.key_action}<br><strong>Summary:</strong> ${analysis.summary}`;
+    document.getElementById('analysis-section').classList.remove('hidden');
+  }
+  document.getElementById('reply-output').textContent = reply;
+  document.getElementById('reply-section').classList.remove('hidden');
+  document.getElementById('sent-msg').classList.add('hidden');
+}
+
+async function refine(instruction) {
+  if (!currentReply) return;
+
+  const output = document.getElementById('reply-output');
+  output.innerHTML = '<span class="spinner"></span> Refining...';
+
+  try {
+    const response = await fetch(`${API}/generate-reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email_body: `Original reply:\n${currentReply}\n\nInstruction: ${instruction}`,
+        email_subject: '',
+        email_from: '',
+        tone: 'professional',
+        intent: instruction,
+        sender_name: document.getElementById('sender-name').value || "User"
+      })
+    });
+
+    // ✅ check server response
+    if (!response.ok) {
+      throw new Error("Server error");
+    }
+
+    const data = await response.json();
+
+    if (!data.result) {
+      throw new Error("Invalid response");
+    }
+
+    const text = data.result;
+
+    // ✅ safer parsing
+    const match = text.match(/REPLY:\s*([\s\S]*)/);
+    const refined = match ? match[1].trim() : text;
+
+    currentReply = refined;
+    output.textContent = refined;
+
+  } catch (error) {
+    console.error("Refine error:", error);
+    output.textContent = currentReply; // fallback
+  }
+}
+
+function copyReply() {
+  navigator.clipboard.writeText(currentReply);
+  const btn = event.target;
+  btn.textContent = 'Copied!';
+  setTimeout(() => btn.textContent = 'Copy', 1500);
+}
+
+async function sendReply() {
+  if (!currentEmail || !currentReply) return;
+  const btn = document.getElementById('send-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Sending...';
+  try {
+    const r = await fetch(`${API}/send-reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: currentEmail.from,
+        subject: currentEmail.subject,
+        body: currentReply,
+        thread_id: currentEmail.id,
+        message_id: currentEmail.id
+      })
+    });
+    const d = await r.json();
+    if (d.success) {
+      document.getElementById('sent-msg').classList.remove('hidden');
+      btn.textContent = 'Send reply via Gmail';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    alert('Failed to send: ' + e.message);
+    btn.textContent = 'Send reply via Gmail';
+    btn.disabled = false;
+  }
+}
+
+function parseName(from) {
+  const m = from.match(/^"?([^"<]+)"?\s*</);
+  return m ? m[1].trim() : from.split('@')[0];
+}
+
+function formatDate(dateStr) {
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    return d.toLocaleDateString([], {month:'short',day:'numeric'});
+  } catch(e) { return ''; }
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+checkAuth();
+</script>
+</body>
+</html>
