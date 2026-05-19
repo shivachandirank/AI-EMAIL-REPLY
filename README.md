@@ -1,6 +1,7 @@
 🚀 AI Email Reply Generator (Gmail + Grok API)
 An intelligent email assistant that reads your Gmail inbox and generates smart, context-aware replies using AI. Built with Flask, Gmail API, and Grok (xAI).
 
+
 📌 Features
 🔐 Google OAuth Authentication (Secure Gmail Access)
 📥 Read Emails from Gmail Inbox
